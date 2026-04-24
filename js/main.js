@@ -99,6 +99,20 @@ async function copyToClipboard(text, label) {
 
 // ── Wallet deep link handlers ──
 function payWithWallet(wallet) {
+  const emailInput = document.getElementById('buyer-email');
+  const emailError = document.getElementById('email-error');
+
+  if (emailInput && emailInput.value.trim() === '') {
+    emailInput.style.borderColor = 'var(--danger)';
+    if (emailError) emailError.style.display = 'block';
+    emailInput.focus();
+    return;
+  }
+
+  if (emailInput && emailError) {
+    emailError.style.display = 'none';
+  }
+
   const address = WALLET_ADDRESS;
   const links = {
     tp: `tokenpocket://`,
@@ -106,10 +120,8 @@ function payWithWallet(wallet) {
     tronlink: `tronlink://`
   };
 
-  // Try deep link first
   window.location.href = links[wallet];
 
-  // After 1.5s, if still on page, show address copy
   setTimeout(() => {
     copyToClipboard(address, '钱包地址');
     showToast('钱包未安装，地址已复制到剪贴板');

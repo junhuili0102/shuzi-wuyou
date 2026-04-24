@@ -293,6 +293,22 @@
               <div style="font-family:var(--font-mono);font-size:0.8rem;color:var(--text-secondary);">#${String(product.id).padStart(6, '0')}</div>
             </div>
           </div>
+          <div style="margin-top:16px;">
+            <label for="buyer-email" style="display:block;font-size:0.8rem;color:var(--text-muted);margin-bottom:6px;font-weight:500;">收货邮箱</label>
+            <input type="email" id="buyer-email" placeholder="请输入您的邮箱地址" required style="
+              width:100%;
+              padding:10px 14px;
+              background:var(--surface);
+              border:1px solid var(--border);
+              border-radius:var(--radius-md);
+              color:var(--text-primary);
+              font-size:0.875rem;
+              box-sizing:border-box;
+              outline:none;
+              transition:border-color 0.2s ease;
+            " onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--border)'">
+            <div id="email-error" style="display:none;font-size:0.75rem;color:var(--danger);margin-top:4px;">请输入有效的邮箱地址</div>
+          </div>
         </div>
       `;
     });
