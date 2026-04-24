@@ -97,20 +97,49 @@ async function copyToClipboard(text, label) {
   }
 }
 
-// ── Wallet deep link handlers ──
-function payWithWallet(wallet) {
+// ── Email confirmation ──
+function confirmEmail() {
   const emailInput = document.getElementById('buyer-email');
   const emailError = document.getElementById('email-error');
+  const confirmedMsg = document.getElementById('email-confirmed');
+  const confirmBtn = document.getElementById('confirm-email-btn');
 
-  if (emailInput && emailInput.value.trim() === '') {
+  if (!emailInput || !emailInput.value.trim()) {
     emailInput.style.borderColor = 'var(--danger)';
     if (emailError) emailError.style.display = 'block';
     emailInput.focus();
     return;
   }
 
-  if (emailInput && emailError) {
-    emailError.style.display = 'none';
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(emailInput.value.trim())) {
+    emailInput.style.borderColor = 'var(--danger)';
+    if (emailError) emailError.style.display = 'block';
+    emailInput.focus();
+    return;
+  }
+
+  if (emailError) emailError.style.display = 'none';
+  emailInput.style.borderColor = 'var(--success)';
+  emailInput.disabled = true;
+  if (confirmedMsg) confirmedMsg.style.display = 'flex';
+  if (confirmBtn) {
+    confirmBtn.textContent = '已确认';
+    confirmBtn.style.background = 'var(--success)';
+    confirmBtn.disabled = true;
+    confirmBtn.style.cursor = 'default';
+    confirmBtn.style.opacity = '1';
+  }
+}
+
+// ── Wallet deep link handlers ──
+function payWithWallet(wallet) {
+  const emailInput = document.getElementById('buyer-email');
+  const confirmedMsg = document.getElementById('email-confirmed');
+
+  if (!emailInput || emailInput.value.trim() === '' || emailInput.disabled !== true) {
+    showToast('请先确认收货邮箱');
+    return;
   }
 
   const address = WALLET_ADDRESS;
