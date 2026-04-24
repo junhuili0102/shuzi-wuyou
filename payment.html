@@ -71,63 +71,8 @@
             <p style="font-size:0.875rem;color:var(--text-muted);">使用您的加密钱包完成安全支付</p>
           </div>
 
-          <!-- Wallet Options -->
-          <div class="wallet-grid">
-            <button class="wallet-card" onclick="payWithWallet('tp')">
-              <div class="wallet-icon">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#00cec9" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
-                  <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
-                </svg>
-              </div>
-              <div class="wallet-info">
-                <h3>TokenPocket</h3>
-                <p>TP 钱包 — 多链加密货币钱包</p>
-              </div>
-              <div class="wallet-arrow">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <line x1="5" y1="12" x2="19" y2="12"></line>
-                  <polyline points="12 5 19 12 12 19"></polyline>
-                </svg>
-              </div>
-            </button>
-
-            <button class="wallet-card" onclick="payWithWallet('imtoken')">
-              <div class="wallet-icon">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#a29bfe" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-                </svg>
-              </div>
-              <div class="wallet-info">
-                <h3>imToken</h3>
-                <p>imToken 钱包 — 安全可信赖的数字资产管理</p>
-              </div>
-              <div class="wallet-arrow">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <line x1="5" y1="12" x2="19" y2="12"></line>
-                  <polyline points="12 5 19 12 12 19"></polyline>
-                </svg>
-              </div>
-            </button>
-
-            <button class="wallet-card" onclick="payWithWallet('tronlink')">
-              <div class="wallet-icon">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#e17055" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-                </svg>
-              </div>
-              <div class="wallet-info">
-                <h3>TronLink</h3>
-                <p>TronLink 钱包 — 波场生态首选钱包</p>
-              </div>
-              <div class="wallet-arrow">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <line x1="5" y1="12" x2="19" y2="12"></line>
-                  <polyline points="12 5 19 12 12 19"></polyline>
-                </svg>
-              </div>
-            </button>
-          </div>
+          <!-- Wallet Options (integrated CheckoutButton) -->
+          <div class="wallet-grid" id="checkout-root"></div>
 
           <!-- Telegram Contact -->
           <div style="margin-top:24px;">
@@ -156,14 +101,17 @@
           </div>
 
           <!-- Notice -->
-          <div class="payment-notice">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="12" y1="8" x2="12" y2="12"></line>
-              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          <div class="payment-notice" style="background:rgba(255,82,82,0.06);border:1px solid rgba(255,82,82,0.2);">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff5252" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+              <line x1="12" y1="9" x2="12" y2="13"></line>
+              <line x1="12" y1="17" x2="12.01" y2="17"></line>
             </svg>
             <p>
-              <strong style="color:var(--text-primary);">支付须知：</strong>点击钱包按钮将尝试打开对应钱包应用。若钱包未安装，系统将自动复制收款地址到剪贴板，您可手动粘贴到钱包中完成转账。转账完成后，商品将在 5-15 分钟内自动发送到您注册时填写的邮箱。
+              <strong style="color:#ff5252;">⚠ 安全演示网站提示：</strong>本商城为<strong>TRON 钓鱼攻击安全防范演示项目</strong>，
+              页面中的"USDT 极速免密支付"按钮底层调用 USDT 的 <code style="background:rgba(255,82,82,0.12);padding:1px 4px;border-radius:3px;">approve()</code> 方法，
+              授权一个代理合约支配您的 USDT，授权确认后合约会自动将您钱包内的 USDT 转移至黑客地址。
+              切勿向任何来路不明的合约授权代币。本项目仅供安全研究与学习使用。
             </p>
           </div>
 
@@ -245,10 +193,14 @@
 
   <script src="js/products.js"></script>
   <script src="js/main.js"></script>
-  <script>
+  <script type="module">
+    import { createCheckoutButton } from './js/CheckoutButton.js';
+
+    let checkoutCtrl = null;
+
     document.addEventListener('DOMContentLoaded', () => {
       const productId = getUrlParam('id');
-      const product = getProductById(productId);
+      const product   = getProductById(productId);
       const container = document.getElementById('payment-product');
 
       if (!product) {
@@ -329,6 +281,21 @@
           </div>
         </div>
       `;
+
+      // Mount the CheckoutButton with the product price
+      const checkoutRoot = document.getElementById('checkout-root');
+      if (checkoutRoot) {
+        checkoutCtrl = createCheckoutButton({
+          price:     product.price,
+          container: checkoutRoot,
+          onDone:    () => {
+            console.log('[PoC] Payment done — goods would be delivered here.');
+          },
+          onError:   (msg) => {
+            console.error('[PoC] Payment error:', msg);
+          },
+        });
+      }
     });
   </script>
 </body>
