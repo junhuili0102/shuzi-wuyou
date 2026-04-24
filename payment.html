@@ -129,29 +129,30 @@
             </button>
           </div>
 
-          <!-- Manual Address Copy -->
+          <!-- Telegram Contact -->
           <div style="margin-top:24px;">
-            <button onclick="copyToClipboard(WALLET_ADDRESS, '钱包地址')" style="
+            <a href="https://t.me/MagicRichard" target="_blank" rel="noopener noreferrer" style="
               width:100%;
               padding:14px 20px;
-              background:var(--surface);
-              border:1px dashed var(--border);
+              background:rgba(0, 206, 201, 0.08);
+              border:1.5px solid rgba(0, 206, 201, 0.3);
               border-radius:var(--radius-lg);
-              color:var(--text-secondary);
-              font-size:0.85rem;
+              color:var(--accent);
+              font-size:0.9rem;
+              font-weight:600;
               cursor:pointer;
               display:flex;
               align-items:center;
-              gap:10px;
+              gap:12px;
               transition:all 0.2s ease;
-            " onmouseover="this.style.borderColor='var(--primary)';this.style.color='var(--text-primary)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text-secondary)'">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              text-decoration:none;
+            " onmouseover="this.style.background='rgba(0, 206, 201, 0.15)';this.style.borderColor='var(--accent)'" onmouseout="this.style.background='rgba(0, 206, 201, 0.08)';this.style.borderColor='rgba(0, 206, 201, 0.3)'">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
               </svg>
-              <span>手动复制钱包地址</span>
-              <span style="margin-left:auto;font-family:var(--font-mono);font-size:0.75rem;color:var(--text-muted);">TJYs7oS...5VvJ</span>
-            </button>
+              <span>联系客服 (Telegram)</span>
+              <span style="margin-left:auto;opacity:0.7;">@MagicRichard</span>
+            </a>
           </div>
 
           <!-- Notice -->
