@@ -5,12 +5,12 @@
 const PRODUCTS = [
   {
     id: 1,
-    name: "数字身份认证套装",
-    description: "包含完整的数字身份认证流程文档、实名认证API接口规范、身份验证SDK以及企业级安全解决方案。适用于Web3平台、金融科技应用和数字资产管理平台。",
-    shortDesc: "完整的数字身份认证解决方案，含文档与SDK",
-    price: 49.99,
+    name: "脸书FB",
+    description: "脸书FB 美国号 原始老白号 uid1000x 邮箱登入 mail.com 开通 2fa 售后 24h 包30天找回 好友0-30 带cookie 可cookie登入",
+    shortDesc: "包首登，使用2FA登陆，特价脸书美国老白号，邮箱登陆地址mail.com",
+    price: 10.99,
     category: "数字身份",
-    image: "https://picsum.photos/seed/digital-id/800/450",
+    image: "https://www.humkt.com/assets/images/product/69e868feaa9c41776838910.webp",
     badge: "hot",
     badgeText: "热门",
     featured: true,
