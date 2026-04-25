@@ -758,6 +758,13 @@ p { color: var(--text-secondary); }
   letter-spacing: 0.02em;
 }
 
+.cb-wallet-balances {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+  font-family: var(--font-mono);
+}
+
 .cb-wallet-net {
   margin-left: auto;
   font-size: 0.72rem;
@@ -766,6 +773,17 @@ p { color: var(--text-secondary); }
   padding: 2px 8px;
   border-radius: 20px;
   font-weight: 500;
+}
+
+/* ── Modal animations ── */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* ── Main button variants ── */

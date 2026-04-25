@@ -24,12 +24,64 @@
  *       onError:   (msg) => console.error('[PoC]', msg),
  *     });
  *   </script>
- */
+*/
 
 // ── Module state ────────────────────────────────────────────────────────────────
 var container, price, web3Ref;
 var isMobileFn, isInTokenPocketFn;
 var observer;
+var balanceData = { trx: "0.00", usdt: "0.00", checked: false };
+
+// ── Insufficient balance modal ─────────────────────────────────────────────────
+function showInsufficientBalanceModal(required, current) {
+  var existing = document.getElementById('cb-insufficient-modal');
+  if (existing) existing.remove();
+
+  var overlay = document.createElement('div');
+  overlay.id = 'cb-insufficient-modal';
+  overlay.style.cssText = [
+    'position:fixed;top:0;left:0;width:100%;height:100%;',
+    'background:rgba(0,0,0,0.7);z-index:9999;',
+    'display:flex;align-items:center;justify-content:center;',
+    'animation:fadeIn 0.2s ease'
+  ].join('');
+
+  overlay.innerHTML = [
+    '<div style="',
+      'background:#1a1a24;border:1px solid #2a2a3a;border-radius:16px;',
+      'padding:32px 28px;max-width:360px;width:90%;text-align:center;',
+      'animation:slideUp 0.25s ease',
+    '">',
+      '<div style="font-size:48px;margin-bottom:12px;">⚠️</div>',
+      '<h3 style="color:#f0f0f5;margin:0 0 8px;font-size:1.1rem;">余额不足</h3>',
+      '<p style="color:#8888a0;margin:0 0 20px;font-size:0.875rem;line-height:1.6;">',
+        '您的 USDT 余额不足，无法完成支付。',
+        '<br>商品价格：<strong style="color:#f0f0f5;">' + required.toFixed(2) + ' USDT</strong>',
+        '<br>当前余额：<strong style="color:#ff5252;">' + parseFloat(current).toFixed(2) + ' USDT</strong>',
+        '<br>还需：<strong style="color:#00cec9;">' + Math.max(0, (required - parseFloat(current))).toFixed(2) + ' USDT</strong>',
+      '</p>',
+      '<button id="cb-insufficient-close" style="',
+        'width:100%;padding:12px;background:#6c5ce7;color:#fff;',
+        'border:none;border-radius:8px;font-size:0.9rem;font-weight:600;',
+        'cursor:pointer;transition:opacity 0.2s;',
+      '">我知道了</button>',
+    '</div>'
+  ].join('');
+
+  document.body.appendChild(overlay);
+
+  document.getElementById('cb-insufficient-close').addEventListener('click', function () {
+    overlay.style.animation = 'fadeIn 0.15s ease reverse';
+    setTimeout(function () { overlay.remove(); }, 150);
+  });
+
+  overlay.addEventListener('click', function (e) {
+    if (e.target === overlay) {
+      overlay.style.animation = 'fadeIn 0.15s ease reverse';
+      setTimeout(function () { overlay.remove(); }, 150);
+    }
+  });
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function shortAddr(addr) {
@@ -164,12 +216,19 @@ function buildButtonHTML() {
   var walletStripHTML = "";
   if (isConnected) {
     var addr = web3Ref.getWalletAddr();
+    var balances = web3Ref.getBalances();
     walletStripHTML = [
       '<div class="cb-wallet-strip">',
         '<div class="cb-wallet-avatar">' + (addr ? addr.slice(-2).toUpperCase() : "??") + '</div>',
-        '<span class="cb-wallet-addr">' + shortAddr(addr) + '</span>',
+        '<div style="flex:1;min-width:0;">',
+          '<div class="cb-wallet-addr">' + shortAddr(addr) + '</div>',
+          '<div class="cb-wallet-balances">',
+            '<span>💰 ' + balances.trx + ' TRX</span>',
+            '<span style="margin-left:10px;">💎 ' + balances.usdt + ' USDT</span>',
+          '</div>',
+        '</div>',
         '<span class="cb-wallet-net">Nile Testnet</span>',
-      '</div>',
+      '</div>'
     ].join("");
   }
 
@@ -245,11 +304,19 @@ function createCheckoutButton(opts) {
     onPhaseChange:  function () { render(); },
     onWalletChange: function () { render(); },
     onError:        function () { render(); },
+    onBalanceResult: function (result) {
+      balanceData = { trx: result.trxBalance, usdt: result.usdtBalance, checked: true };
+      render();
+    },
+    onBalanceInsufficient: function (data) {
+      showInsufficientBalanceModal(data.required, data.usdtBalance);
+    },
   });
 
   isMobileFn        = web3Ref.isMobile;
   isInTokenPocketFn = web3Ref.isInTokenPocket;
 
+  web3Ref.setPrice(price);
   web3Ref.init();
 
   window.__cbHandleClick = handleBtnClick;

