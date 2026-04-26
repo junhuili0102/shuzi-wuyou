@@ -94,7 +94,6 @@ function buildButtonHTML() {
   var phase        = web3Ref.getPhase();
   var isConnected  = web3Ref.isConnected();
   var isMobile     = isMobileFn();
-  var isInTP       = isInTokenPocketFn();
   var connecting   = web3Ref.isConnecting();
   var txHash       = web3Ref.getTxHash();
   var errorMsg     = web3Ref.getErrorMsg();
@@ -134,7 +133,7 @@ function buildButtonHTML() {
     btnClass    = "btn btn-danger-outline";
     btnDisabled = "";
   } else if (!isConnected) {
-    btnLabel    = (isMobile && !isInTP)
+    btnLabel    = (isMobile && !window.tronWeb)
                     ? "\u547c\u8d77\u94b1\u5305\u8fdb\u884c\u5b89\u5168\u652f\u4ed8"
                     : "\u8fde\u63a5\u94b1\u5305";
     btnClass    = "btn btn-primary cb-connect";
@@ -314,7 +313,6 @@ function createCheckoutButton(opts) {
   });
 
   isMobileFn        = web3Ref.isMobile;
-  isInTokenPocketFn = web3Ref.isInTokenPocket;
 
   web3Ref.setPrice(price);
   web3Ref.init();

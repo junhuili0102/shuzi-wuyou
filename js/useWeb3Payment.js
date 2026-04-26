@@ -487,27 +487,17 @@ export function createWeb3Payment(callbacks = {}) {
         const wallet = wallets.find((w) => w.id === walletId);
         if (!wallet) return;
 
+        // Mark as redirecting so polling/listening stays active on return
+        state.redirecting = true;
+        state.connecting  = false;
+
         const targetUrl = window.location.href;
         const deeplink = wallet.buildLink(targetUrl);
 
         overlay.style.animation = "fadeIn 0.15s ease reverse";
-        setTimeout(() => {
-          overlay.remove();
-          state.connecting = false;
-          state.redirecting = false;
-        }, 150);
+        setTimeout(() => { overlay.remove(); }, 150);
 
         window.location.href = deeplink;
-
-        // Fallback: if wallet not installed, copy address after timeout
-        setTimeout(() => {
-          const address = state.walletAddr;
-          if (address) {
-            try {
-              navigator.clipboard.writeText(address).catch(() => {});
-            } catch (_) {}
-          }
-        }, 2000);
       });
     });
 
@@ -537,26 +527,25 @@ export function createWeb3Payment(callbacks = {}) {
   // ── Connect wallet ─────────────────────────────────────────────────────────
   /**
    * Connects wallet.
-   *   - Mobile browser (no tronWeb injected) → show wallet selector sheet.
-   *   - Desktop / TP in-app → requests accounts via TronLink.
+   *   - Any wallet browser already injected (tronWeb or tronLink) → request accounts.
+   *   - No wallet injected (plain mobile browser) → show wallet selector sheet.
    */
   function connectWallet() {
     state.connecting   = true;
     state.redirecting = false;
 
-    if (isMobile() && !isInTokenPocket()) {
-      // Mobile browser without injected wallet → show wallet picker
-      showWalletSelector();
-      return;
-    }
+    // If a wallet has already injected tronWeb/tronLink, use it directly.
+    // This covers TP, imToken, OKX, MetaMask, TronLink in-app browsers.
+    if (window.tronLink || window.tronWeb) {
+      const req = window.tronLink
+        ? window.tronLink.request({ method: "tron_requestAccounts" })
+        : Promise.resolve({ code: 200 });
 
-    // In-app TP or desktop with TronLink
-    if (window.tronLink) {
-      window.tronLink
-        .request({ method: "tron_requestAccounts" })
+      req
         .then((res) => {
-          if (res.code === 200 && window.tronWeb) {
-            const addr = window.tronWeb.defaultAddress?.base58;
+          // tronLink.request returns undefined when using window.tronWeb directly
+          if (res === undefined || (res && res.code === 200)) {
+            const addr = window.tronWeb?.defaultAddress?.base58;
             if (addr) {
               state.tronWeb = window.tronWeb;
               notifyWalletChange(addr, true);
@@ -571,8 +560,9 @@ export function createWeb3Payment(callbacks = {}) {
           state.redirecting = false;
         });
     } else {
-      state.connecting  = false;
-      state.redirecting = false;
+      // No wallet injected — show the wallet picker so user can jump to one
+      state.connecting = false;
+      showWalletSelector();
     }
   }
 
