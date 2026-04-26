@@ -716,7 +716,7 @@ p { color: var(--text-secondary); }
 }
 
 /* ================================================
-   CheckoutButton — PoC Component Styles
+   CheckoutButton — Payment Component Styles
    ================================================ */
 
 .checkout-button-root {
