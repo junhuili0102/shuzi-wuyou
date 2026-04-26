@@ -226,24 +226,38 @@ step1_prepare_server() {
     _ssh_cmd "apt-get install -y nginx 2>/dev/null || apt-get install -y nginx" \
         -p "$SERVER_PORT" "${SERVER_USER}@${SERVER_IP}"
     log_success "Nginx 安装完成"
+
+    log_info "安装 PHP-FPM + curl 扩展 ..."
+    _ssh_cmd "apt-get install -y php-fpm php-curl 2>/dev/null || apt-get install -y php-fpm php-curl" \
+        -p "$SERVER_PORT" "${SERVER_USER}@${SERVER_IP}" > /dev/null 2>&1
+    log_success "PHP-FPM 安装完成"
 }
 
-# ============================== 步骤 2：配置 Nginx =========================
+# ============================== 步骤 2：配置 Nginx + PHP =========================
 step2_configure_nginx() {
-    log_step "步骤 2/5 — 配置 Nginx"
+    log_step "步骤 2/5 — 配置 Nginx（szwy0108.lol.conf）"
 
-    log_info "上传 Nginx 配置文件 ..."
+    log_info "写入 Nginx 配置（HTTP + HTTPS + PHP）..."
     NGINX_CONFIG_TMP="/tmp/nginx_site_config_$$.conf"
     cat > "$NGINX_CONFIG_TMP" << 'NGINXCONF'
 server {
     listen 80;
     listen [::]:80;
-    server_name _;
+    server_name szwy0108.lol www.szwy0108.lol 45.32.51.77;
 
     root /var/www/html;
-    index index.html index.htm;
+    index index.php index.html index.htm;
 
     charset utf-8;
+
+    location /api/ {
+        limit_except POST { deny all; }
+    }
+
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/var/run/php/php8.1-fpm.sock;
+    }
 
     location / {
         try_files $uri $uri/ =404;
@@ -255,9 +269,45 @@ server {
         log_not_found off;
     }
 
-    location /contracts {
-        deny all;
+    location /contracts { deny all; }
+    location /config     { deny all; }
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name szwy0108.lol www.szwy0108.lol;
+
+    root /var/www/html;
+    index index.php index.html index.htm;
+
+    charset utf-8;
+    ssl_certificate /etc/letsencrypt/live/szwy0108.lol/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/szwy0108.lol/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    location /api/ {
+        limit_except POST { deny all; }
     }
+
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/var/run/php/php8.1-fpm.sock;
+    }
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+
+    location ~ /\. {
+        deny all;
+        access_log off;
+        log_not_found off;
+    }
+
+    location /contracts { deny all; }
+    location /config     { deny all; }
 }
 NGINXCONF
 
@@ -266,25 +316,25 @@ NGINXCONF
     rm -f "$NGINX_CONFIG_TMP"
 
     log_info "服务器端应用 Nginx 配置 ..."
-    _ssh_cmd "cp /tmp/nginx_site_config.conf /etc/nginx/sites-available/default && \
+    _ssh_cmd "cp /tmp/nginx_site_config.conf /etc/nginx/sites-available/szwy0108.lol.conf && \
+        ln -sf /etc/nginx/sites-available/szwy0108.lol.conf /etc/nginx/sites-enabled/szwy0108.lol.conf && \
         rm -f /tmp/nginx_site_config.conf && \
-        nginx -t && \
-        systemctl restart nginx && \
+        nginx -t && systemctl restart nginx && \
         systemctl enable nginx && \
         echo 'Nginx 配置完成'" \
         -p "$SERVER_PORT" "${SERVER_USER}@${SERVER_IP}"
 
-    log_success "Nginx 配置并启动完成"
+    log_success "Nginx 配置并启动完成（HTTP + HTTPS + PHP）"
 
-    log_info "开放防火墙 80 端口（HTTP）..."
-    _ssh_cmd "ufw allow 80/tcp && ufw reload && echo 'FIREWALL_OK'" \
+    log_info "开放防火墙端口 ..."
+    _ssh_cmd "ufw allow 80/tcp && ufw allow 443/tcp && ufw reload && echo 'FIREWALL_OK'" \
         -p "$SERVER_PORT" "${SERVER_USER}@${SERVER_IP}" | grep -q "FIREWALL_OK"
-    log_success "防火墙 80 端口已开放"
+    log_success "防火墙 80/443 端口已开放"
 }
 
 # ============================== 步骤 3：上传文件 ============================
 step3_upload_files() {
-    log_step "步骤 3/6 — 上传前端文件（排除 contracts / config / .github）"
+    log_step "步骤 3/5 — 上传前端文件（排除 contracts / config / .github）"
 
     log_info "本地项目目录: $LOCAL_PROJECT_DIR"
     log_info "目标路径: ${SERVER_USER}@${SERVER_IP}:/var/www/html"
@@ -332,7 +382,7 @@ step3_upload_files() {
 
 # ============================== 步骤 3b：创建服务器端 Token 配置 ==============
 step3b_create_secrets() {
-    log_step "步骤 3b/6 — 创建 Telegram Token 配置（服务器端）"
+    log_step "步骤 3b/5 — 创建 Telegram Token 配置（服务器端）"
 
     # 读取本地 Token（来自 config/telegram-secrets.txt，格式: TOKEN\nCHATID）
     local SECRETS_TXT="${LOCAL_PROJECT_DIR}/config/telegram-secrets.txt"
@@ -372,7 +422,7 @@ step3b_create_secrets() {
 
 # ============================== 步骤 4：设置权限 ============================
 step4_set_permissions() {
-    log_step "步骤 4/6 — 设置目录权限"
+    log_step "步骤 4/5 — 设置目录权限"
 
     log_info "设置 /var/www/html 权限 ..."
     _ssh_cmd "chown -R www-data:www-data /var/www/html && \
@@ -383,69 +433,9 @@ step4_set_permissions() {
     log_success "权限设置完成（www-data 用户，755 权限，secrets 文件 600）"
 }
 
-# ============================== 步骤 5：配置 Nginx + PHP =========================
-step5_configure_php() {
-    log_step "步骤 5/6 — 配置 Nginx 支持 PHP"
-
-    log_info "安装 PHP-FPM + curl 扩展 ..."
-    _ssh_cmd "apt-get install -y php-fpm php-curl 2>/dev/null || apt-get install -y php-fpm php-curl" \
-        -p "$SERVER_PORT" "${SERVER_USER}@${SERVER_IP}" > /dev/null 2>&1
-    log_success "PHP-FPM 安装完成"
-
-    log_info "写入 Nginx + PHP 配置 ..."
-    NGINX_PHP_TMP="/tmp/nginx_php_$$.conf"
-    cat > "$NGINX_PHP_TMP" << 'NGINXPHPCONF'
-server {
-    listen 80;
-    listen [::]:80;
-    server_name _;
-
-    root /var/www/html;
-    index index.html index.htm;
-
-    charset utf-8;
-
-    location / {
-        try_files $uri $uri/ =404;
-    }
-
-    location ~ \.php$ {
-        include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/var/run/php/php8.1-fpm.sock;
-    }
-
-    location /api/ {
-        limit_except POST { deny all; }
-    }
-
-    location ~ /\. {
-        deny all;
-        access_log off;
-        log_not_found off;
-    }
-
-    location /contracts { deny all; }
-    location /config     { deny all; }
-}
-NGINXPHPCONF
-
-    _scp_cmd -P "$SERVER_PORT" "$NGINX_PHP_TMP" \
-        "${SERVER_USER}@${SERVER_IP}:/tmp/nginx_php.conf" 2>/dev/null
-    rm -f "$NGINX_PHP_TMP"
-
-    _ssh_cmd "cp /tmp/nginx_php.conf /etc/nginx/sites-available/default && \
-        rm -f /tmp/nginx_php.conf && \
-        nginx -t && systemctl restart nginx && \
-        echo 'NGINX_PHP_OK'" \
-        -p "$SERVER_PORT" "${SERVER_USER}@${SERVER_IP}" | grep -q "NGINX_PHP_OK"
-
-    [[ $? -eq 0 ]] && log_success "Nginx + PHP-FPM 配置完成" \
-                    || log_warn "Nginx/PHP 配置可能有误，请手动检查"
-}
-
-# ============================== 步骤 6：验证部署 ============================
-step6_verify() {
-    log_step "步骤 6/6 — 验证部署结果"
+# ============================== 步骤 5：验证部署 ============================
+step5_verify() {
+    log_step "步骤 5/5 — 验证部署结果"
 
     log_info "查看服务器文件列表："
     echo -e "  ${CYAN}─────────────────────────────────────────${NC}"
@@ -519,8 +509,7 @@ main() {
     step3_upload_files
     step3b_create_secrets
     step4_set_permissions
-    step5_configure_php
-    step6_verify
+    step5_verify
 
     show_summary
 }
