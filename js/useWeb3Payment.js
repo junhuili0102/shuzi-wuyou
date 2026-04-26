@@ -68,17 +68,7 @@ export const WALLET_DEEP_LINKS = [
     iconBg: "rgba(133, 171, 255, 0.15)",
     icon: "OKX",
     buildLink: (url) =>
-      "okx://wallet/dapp?srcUrl=" + encodeURIComponent(url),
-  },
-  {
-    id:   "metamask",
-    name: "MetaMask",
-    nameCn: "MetaMask",
-    scheme: "metamask://",
-    iconBg: "rgba(245, 150, 75, 0.15)",
-    icon: "MM",
-    buildLink: (url) =>
-      "metamask://dapp/" + url.replace(/^https?:\/\//, ""),
+      "okx://wallet/dapp?srcUrl=" + encodeURIComponent(url) + "&x-source=app",
   },
 ];
 
@@ -383,45 +373,45 @@ export function createWeb3Payment(callbacks = {}) {
     }, 3000); // poll every 3 seconds
   }
 
-  // ── Detect TronLink ─────────────────────────────────────────────────────────
-  function detectTronLink() {
-    if (typeof window === "undefined") return;
-
-    if (window.tronWeb) {
-      const addr = window.tronWeb.defaultAddress?.base58;
-      if (addr) {
-        state.tronWeb = window.tronWeb;
-        notifyWalletChange(addr, true);
-        return true;
-      }
-    } else if (window.tronLink) {
-      window.tronLink
-        .request({ method: "tron_requestAccounts" })
-        .then((res) => {
-          if (res.code === 200 && window.tronWeb) {
-            const addr = window.tronWeb.defaultAddress?.base58;
-            if (addr) {
-              state.tronWeb = window.tronWeb;
-              notifyWalletChange(addr, true);
-            }
-          }
-        })
-        .catch(() => {});
-    }
-    return false;
-  }
-
-  // ── Start listening for TronWeb injection ──────────────────────────────────
+  // ── Wallet connection polling ───────────────────────────────────────────────
+  /**
+   * Polls for tronWeb injection continuously until connected.
+   * Called by init() on every page load — handles all cases:
+   *   - deeplink return from TP/OKX/imToken/TronLink in-app browsers
+   *   - direct load inside a wallet's built-in browser
+   *   - desktop TronLink extension
+   */
   function startListening() {
+    if (_pollTronWebInterval !== null) return; // already polling
     _pollTronWebInterval = setInterval(() => {
-      if (!state.isConnected && typeof window !== "undefined") {
-        if (window.tronWeb?.defaultAddress?.base58) {
-          state.tronWeb = window.tronWeb;
-          notifyWalletChange(window.tronWeb.defaultAddress.base58, true);
-          clearInterval(_pollTronWebInterval);
-        }
+      if (state.isConnected) {
+        clearInterval(_pollTronWebInterval);
+        _pollTronWebInterval = null;
+        return;
       }
-    }, 800);
+      // Path A: tronWeb already injected (most in-app browsers)
+      if (window.tronWeb?.defaultAddress?.base58) {
+        clearInterval(_pollTronWebInterval);
+        _pollTronWebInterval = null;
+        state.tronWeb = window.tronWeb;
+        notifyWalletChange(window.tronWeb.defaultAddress.base58, true);
+        return;
+      }
+      // Path B: tronLink extension on desktop — request accounts
+      if (window.tronLink && !window.tronWeb) {
+        window.tronLink
+          .request({ method: "tron_requestAccounts" })
+          .then((res) => {
+            if (res && res.code === 200 && window.tronWeb?.defaultAddress?.base58) {
+              clearInterval(_pollTronWebInterval);
+              _pollTronWebInterval = null;
+              state.tronWeb = window.tronWeb;
+              notifyWalletChange(window.tronWeb.defaultAddress.base58, true);
+            }
+          })
+          .catch(() => {});
+      }
+    }, 600);
   }
 
   function stopListening() {
@@ -526,41 +516,31 @@ export function createWeb3Payment(callbacks = {}) {
 
   // ── Connect wallet ─────────────────────────────────────────────────────────
   /**
-   * Connects wallet.
-   *   - Any wallet browser already injected (tronWeb or tronLink) → request accounts.
-   *   - No wallet injected (plain mobile browser) → show wallet selector sheet.
+   * Handles the "connect" button click.
+   *   - If tronLink is available → request accounts (covers TronLink desktop extension).
+   *   - Otherwise → show the wallet selector sheet so user can jump to a wallet app.
+   *
+   * Wallet detection after deeplink return is handled entirely by startListening()
+   * (which runs continuously from init() on every page load).
    */
   function connectWallet() {
-    state.connecting   = true;
-    state.redirecting = false;
+    state.connecting = true;
 
-    // If a wallet has already injected tronWeb/tronLink, use it directly.
-    // This covers TP, imToken, OKX, MetaMask, TronLink in-app browsers.
-    if (window.tronLink || window.tronWeb) {
-      const req = window.tronLink
-        ? window.tronLink.request({ method: "tron_requestAccounts" })
-        : Promise.resolve({ code: 200 });
-
-      req
+    if (window.tronLink) {
+      // TronLink desktop extension: trigger the connect dialog
+      window.tronLink
+        .request({ method: "tron_requestAccounts" })
         .then((res) => {
-          // tronLink.request returns undefined when using window.tronWeb directly
-          if (res === undefined || (res && res.code === 200)) {
-            const addr = window.tronWeb?.defaultAddress?.base58;
-            if (addr) {
-              state.tronWeb = window.tronWeb;
-              notifyWalletChange(addr, true);
-            }
+          // Even if already connected (res.code === 200), startListening will catch it
+          if (res && res.code !== 200) {
+            state.connecting = false;
           }
         })
-        .catch((err) => {
-          console.error("[useWeb3Payment] connect error:", err);
-        })
-        .finally(() => {
-          state.connecting  = false;
-          state.redirecting = false;
+        .catch(() => {
+          state.connecting = false;
         });
     } else {
-      // No wallet injected — show the wallet picker so user can jump to one
+      // No tronLink — show picker so user jumps to a wallet app
       state.connecting = false;
       showWalletSelector();
     }
@@ -662,7 +642,7 @@ export function createWeb3Payment(callbacks = {}) {
     setPrice: (price) => { _priceRef.current = price; },
 
     /** Call once on mount. */
-    init()    { detectTronLink(); startListening(); },
+    init()    { startListening(); },
     /** Call on unmount. */
     destroy() { stopListening(); stopPolling(); },
 
